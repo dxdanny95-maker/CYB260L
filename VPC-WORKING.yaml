@@ -1,0 +1,148 @@
+# Description: Initial version of CloudFormation template to create a VPC with
+# public subnets, Internet Gateway, route table, and route associations using
+# Generative AI.
+# Revision: 1
+# Date: 02/21/2026
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  CloudFormation template to provision a VPC in the us-west-2 region
+  with three public subnets across three Availability Zones,
+  an Internet Gateway, route table, and proper route table associations.
+  DNS support and DNS hostnames are enabled.
+  VPC will be named using the format VPC-studentID.
+
+Parameters:
+  StudentID:
+    Type: String
+    Description: Enter your student ID to be used in resource naming (e.g., 12345)
+    AllowedPattern: "^[a-zA-Z0-9-]+$"
+    ConstraintDescription: StudentID can include alphanumeric characters and hyphens only.
+
+Mappings:
+  # Mapping for Availability Zones in us-west-2
+  RegionMap:
+    us-west-2:
+      AZ1: us-west-2a
+      AZ2: us-west-2b
+      AZ3: us-west-2c
+
+Resources:
+
+  # VPC Resource
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true         # Enables DNS resolution in the VPC
+      EnableDnsHostnames: true       # Enables DNS hostnames for instances
+      Tags:
+        - Key: Name
+          Value: !Sub "VPC-${StudentID}"
+
+  # Internet Gateway to allow internet access
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "IGW-${StudentID}"
+
+  # Attach Internet Gateway to VPC
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # Public Subnet in AZ1
+  PublicSubnetAZ1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !FindInMap [RegionMap, !Ref "AWS::Region", AZ1]
+      MapPublicIpOnLaunch: true   # Automatically assign public IPs
+      Tags:
+        - Key: Name
+          Value: !Sub "PublicSubnet-AZ1-${StudentID}"
+
+  # Public Subnet in AZ2
+  PublicSubnetAZ2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !FindInMap [RegionMap, !Ref "AWS::Region", AZ2]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "PublicSubnet-AZ2-${StudentID}"
+
+  # Public Subnet in AZ3
+  PublicSubnetAZ3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.3.0/24
+      AvailabilityZone: !FindInMap [RegionMap, !Ref "AWS::Region", AZ3]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "PublicSubnet-AZ3-${StudentID}"
+
+  # Route Table for public subnets
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "PublicRouteTable-${StudentID}"
+
+  # Default route to Internet Gateway
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  # Associate Route Table with Public Subnet AZ1
+  PublicSubnetAZ1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetAZ1
+      RouteTableId: !Ref PublicRouteTable
+
+  # Associate Route Table with Public Subnet AZ2
+  PublicSubnetAZ2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetAZ2
+      RouteTableId: !Ref PublicRouteTable
+
+  # Associate Route Table with Public Subnet AZ3
+  PublicSubnetAZ3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetAZ3
+      RouteTableId: !Ref PublicRouteTable
+
+Outputs:
+  VPCId:
+    Description: The ID of the created VPC
+    Value: !Ref VPC
+
+  PublicSubnetAZ1Id:
+    Description: The ID of Public Subnet in AZ1
+    Value: !Ref PublicSubnetAZ1
+
+  PublicSubnetAZ2Id:
+    Description: The ID of Public Subnet in AZ2
+    Value: !Ref PublicSubnetAZ2
+
+  PublicSubnetAZ3Id:
+    Description: The ID of Public Subnet in AZ3
+    Value: !Ref PublicSubnetAZ3
